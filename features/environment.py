@@ -86,13 +86,15 @@ class AbstractController(abc.ABC):
 
 
 class PatroniController(AbstractController):
-    __PORT = 5360
+    __PG_PORT = 5360
+    __PATRONI_PORT = 8008
     PATRONI_CONFIG = '{}.yml'
     """ starts and stops individual patronis"""
 
     def __init__(self, context, name, work_directory, output_dir, custom_config=None):
         super(PatroniController, self).__init__(context, 'patroni_' + name, work_directory, output_dir)
-        PatroniController.__PORT += 1
+        PatroniController.__PG_PORT += 1
+        PatroniController.__PATRONI_PORT += 1
         self._data_dir = os.path.join(work_directory, 'data', name)
         self._connstring = None
         if custom_config and 'watchdog' in custom_config:
@@ -192,12 +194,16 @@ class PatroniController(AbstractController):
             config['raft'] = {'data_dir': self._output_dir, 'self_addr': 'localhost:' + os.environ['RAFT_PORT']}
 
         host = config['restapi']['listen'].rsplit(':', 1)[0]
-        config['restapi']['listen'] = config['restapi']['connect_address'] = '{}:{}'.format(host, 8008 + int(name[-1]))
+        config['restapi']['listen'] = config['restapi']['connect_address'] = '{}:{}'.format(host, self.__PATRONI_PORT)
 
         host = config['postgresql']['listen'].rsplit(':', 1)[0]
-        config['postgresql']['listen'] = config['postgresql']['connect_address'] = '{0}:{1}'.format(host, self.__PORT)
+        config['postgresql']['listen'] = config['postgresql']['connect_address'] = '{0}:{1}'.format(host, self.__PG_PORT)
 
-        config['name'] = name
+
+        if custom_config and len(custom_config.get('name', '')) > 0:
+            config['name'] = custom_config['name']
+        else:
+            config['name'] = name
         config['postgresql']['data_dir'] = self._data_dir.replace('\\', '/')
         config['postgresql']['basebackup'] = [{'checkpoint': 'fast'}]
         config['postgresql']['callbacks'] = {
@@ -262,17 +268,17 @@ class PatroniController(AbstractController):
             }
         })
         if config['postgresql'].get('callbacks', {}).get('on_role_change'):
-            config['postgresql']['callbacks']['on_role_change'] += ' ' + str(self.__PORT)
+            config['postgresql']['callbacks']['on_role_change'] += ' ' + str(self.__PG_PORT)
 
         with open(patroni_config_path, 'w') as f:
             yaml.safe_dump(config, f, default_flow_style=False)
 
         self._connkwargs = config['postgresql'].get('authentication', config['postgresql']).get('superuser', {})
-        self._connkwargs.update({'host': host, 'port': self.__PORT, 'dbname': 'postgres',
+        self._connkwargs.update({'host': host, 'port': self.__PG_PORT, 'dbname': 'postgres',
                                  'user': self._connkwargs.pop('username', None)})
 
         self._replication = config['postgresql'].get('authentication', config['postgresql']).get('replication', {})
-        self._replication.update({'host': host, 'port': self.__PORT, 'user': self._replication.pop('username', None)})
+        self._replication.update({'host': host, 'port': self.__PG_PORT, 'user': self._replication.pop('username', None)})
         self._restapi_url = 'http://{0}'.format(config['restapi']['connect_address'])
         if self._context.certfile:
             self._restapi_url = self._restapi_url.replace('http://', 'https://')
@@ -747,7 +753,7 @@ class RaftController(AbstractDcsController):
                           PATRONI_RAFT_PASSWORD=self.PASSWORD, RAFT_PORT='1234')
         self._raft = None
 
-    def _start(self):
+    def start(self):
         env = os.environ.copy()
         del env['PATRONI_RAFT_PARTNER_ADDRS']
         env['PATRONI_RAFT_SELF_ADDR'] = self.CONTROLLER_ADDR

@@ -8,6 +8,23 @@ from time import sleep, time
 def start_patroni(context, name):
     return context.pctl.start(name)
 
+@when('I start {name:w} ({conf_name:w})')
+def start_patroni_alias(context, name, conf_name):
+    return context.pctl.start(name, custom_config={
+        "name": conf_name
+    })
+
+@step('I start duplicate {name:w} called {ref:w}')
+def start_duplicate_patroni(context, name, ref):
+    return context.pctl.start(ref, custom_config={
+        "name": name
+    })
+
+@step('I go insane')
+def go_insane(context):
+    return context.pctl.start("postgres0'", custom_config={
+        "name": "postgres0"
+    })
 
 @step('I shut down {name:w}')
 def stop_patroni(context, name):
