@@ -85,12 +85,13 @@ Feature: basic replication
     Then table buz is present on postgres0 after 20 seconds
 
   Scenario: check graceful rejection when two nodes with same name
-    # Given I shut down postgres0
-    # And I shut down postgres1
-    Given I start postgres0
-    Then postgres0 is a leader after 5 seconds
+    Given I start postgres0 
+    And I shut down postgres1
+    And I shut down postgres2
+    Then postgres0 is a leader after 10 seconds
     When I start postgres1
-    Then postgres1 role is the secondary after 5 seconds
+    Then postgres1 role is the secondary after 10 seconds
     When I start duplicate postgres0 called postgres0_dup 
-    When I sleep for 10 seconds
-    Then postgres1 role is the secondary after 30 seconds
+    Then There are 2 nodes after 10 seconds
+    And postgres0 is a leader after 10 seconds
+    And postgres1 role is the secondary after 10 seconds 

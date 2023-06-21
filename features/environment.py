@@ -199,7 +199,6 @@ class PatroniController(AbstractController):
         host = config['postgresql']['listen'].rsplit(':', 1)[0]
         config['postgresql']['listen'] = config['postgresql']['connect_address'] = '{0}:{1}'.format(host, self.__PG_PORT)
 
-
         if custom_config and len(custom_config.get('name', '')) > 0:
             config['name'] = custom_config['name']
         else:
@@ -313,6 +312,15 @@ class PatroniController(AbstractController):
                 row = cur.fetchone()
                 if row and row[0] == recovery_status:
                     return True
+            time.sleep(1)
+        return False
+    
+    def check_node_count(self, desired_value, timeout=10):
+        bound_time = time.time() + timeout
+        while time.time() < bound_time:
+            self.purge_dead_nodes()
+            if len(self._processes) == desired_value:
+                return True
             time.sleep(1)
         return False
 
@@ -753,7 +761,7 @@ class RaftController(AbstractDcsController):
                           PATRONI_RAFT_PASSWORD=self.PASSWORD, RAFT_PORT='1234')
         self._raft = None
 
-    def start(self):
+    def _start(self):
         env = os.environ.copy()
         del env['PATRONI_RAFT_PARTNER_ADDRS']
         env['PATRONI_RAFT_SELF_ADDR'] = self.CONTROLLER_ADDR
@@ -833,10 +841,12 @@ class PatroniPoolController(object):
 
     def __getattr__(self, func):
         if func not in ['stop', 'query', 'write_label', 'read_label', 'check_role_has_changed_to',
-                        'add_tag_to_config', 'get_watchdog', 'patroni_hang', 'backup']:
+                        'add_tag_to_config', 'get_watchdog', 'patroni_hang', 'backup', 'check_node_count']:
             raise AttributeError("PatroniPoolController instance has no attribute '{0}'".format(func))
 
         def wrapper(name, *args, **kwargs):
+            if name not in self._processes:
+                return None
             return getattr(self._processes[name], func)(*args, **kwargs)
         return wrapper
 
@@ -845,6 +855,17 @@ class PatroniPoolController(object):
             ctl.cancel_background()
             ctl.stop()
         self._processes.clear()
+
+
+    def purge_dead_nodes(self):
+        purged = []
+        for name, ctl in self._processes.items():
+            if ctl.poll() is None:
+                ctl.cancel_background()
+                ctl.stop()
+        for name in purged:
+            del self._processes[name]
+
 
     def create_and_set_output_directory(self, feature_name):
         feature_dir = os.path.join(self.patroni_path, 'features', 'output', feature_name.replace(' ', '_'))
