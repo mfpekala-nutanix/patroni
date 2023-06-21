@@ -1,3 +1,7 @@
+# For development ease
+data
+venv
+
 *.py[cod]
 
 # vi(m) swap files:
