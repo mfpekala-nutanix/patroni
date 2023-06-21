@@ -957,6 +957,11 @@ class RestApiHandler(BaseHTTPRequestHandler):
             members = [m for m in cluster.members if not cluster.leader or m.name != cluster.leader.name and m.api_url]
             if not members:
                 return action + ' is not possible: cluster does not have members except leader'
+        print("###########################################")
+        print("aqui")
+        print(members)
+        print("###########################################")
+        return None
         for st in self.server.patroni.ha.fetch_nodes_statuses(members):
             if st.failover_limitation() is None:
                 return None

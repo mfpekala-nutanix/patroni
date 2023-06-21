@@ -1,3 +1,7 @@
+# For venv development
+venv
+data
+
 *.py[cod]
 
 # vi(m) swap files:
