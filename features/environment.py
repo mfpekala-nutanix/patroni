@@ -314,15 +314,6 @@ class PatroniController(AbstractController):
                     return True
             time.sleep(1)
         return False
-    
-    def check_node_count(self, desired_value, timeout=10):
-        bound_time = time.time() + timeout
-        while time.time() < bound_time:
-            self.purge_dead_nodes()
-            if len(self._processes) == desired_value:
-                return True
-            time.sleep(1)
-        return False
 
     def get_watchdog(self):
         return self.watchdog
@@ -335,6 +326,9 @@ class PatroniController(AbstractController):
             return int(open(pidfile).readline().strip())
         except Exception:
             return None
+
+    def is_running(self):
+        return self._is_running()
 
     def patroni_hang(self, timeout):
         hang = ProcessHang(self._handle.pid, timeout)
@@ -841,7 +835,7 @@ class PatroniPoolController(object):
 
     def __getattr__(self, func):
         if func not in ['stop', 'query', 'write_label', 'read_label', 'check_role_has_changed_to',
-                        'add_tag_to_config', 'get_watchdog', 'patroni_hang', 'backup', 'check_node_count']:
+                        'add_tag_to_config', 'get_watchdog', 'patroni_hang', 'backup']:
             raise AttributeError("PatroniPoolController instance has no attribute '{0}'".format(func))
 
         def wrapper(name, *args, **kwargs):
@@ -860,11 +854,21 @@ class PatroniPoolController(object):
     def purge_dead_nodes(self):
         purged = []
         for name, ctl in self._processes.items():
-            if ctl.poll() is None:
+            if not ctl.is_running():
                 ctl.cancel_background()
                 ctl.stop()
+                purged.append(name)
         for name in purged:
             del self._processes[name]
+    
+    def check_node_count(self, desired_value, timeout=10):
+        bound_time = time.time() + timeout
+        while time.time() < bound_time:
+            self.purge_dead_nodes()
+            if len(self._processes) == desired_value:
+                return True
+            time.sleep(1)
+        return False
 
 
     def create_and_set_output_directory(self, feature_name):
