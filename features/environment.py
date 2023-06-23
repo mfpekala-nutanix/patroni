@@ -45,7 +45,7 @@ class AbstractController(abc.ABC):
     def _start(self):
         """start process"""
 
-    def start(self, max_wait_limit=5):
+    def start(self, max_wait_limit=5, should_wait=True):
         if self._is_running():
             return True
 
@@ -53,6 +53,9 @@ class AbstractController(abc.ABC):
         self._handle = self._start()
 
         assert self._has_started(), "Process {0} is not running after being started".format(self._name)
+
+        if not should_wait:
+            return
 
         max_wait_limit *= self._context.timeout_multiplier
         for _ in range(max_wait_limit):
@@ -827,11 +830,11 @@ class PatroniPoolController(object):
     def output_dir(self):
         return self._output_dir
 
-    def start(self, name, max_wait_limit=40, custom_config=None):
+    def start(self, name, max_wait_limit=40, custom_config=None, should_wait=True):
         if name not in self._processes:
             self._processes[name] = PatroniController(self._context, name, self.patroni_path,
                                                       self._output_dir, custom_config)
-        self._processes[name].start(max_wait_limit)
+        self._processes[name].start(max_wait_limit, should_wait)
 
     def __getattr__(self, func):
         if func not in ['stop', 'query', 'write_label', 'read_label', 'check_role_has_changed_to',

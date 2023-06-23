@@ -12,7 +12,7 @@ def start_patroni(context, name):
 def start_duplicate_patroni(context, name, ref):
     return context.pctl.start(ref, custom_config={
         "name": name
-    })
+    }, should_wait=False)
 
 @step('I shut down {name:w}')
 def stop_patroni(context, name):

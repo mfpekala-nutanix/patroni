@@ -6,6 +6,7 @@ import time
 
 from argparse import Namespace
 from typing import Any, Dict, Optional, TYPE_CHECKING
+from .exceptions import ConfigParseError
 
 from patroni.daemon import AbstractPatroniDaemon, abstract_main, get_base_arg_parser
 
@@ -47,6 +48,15 @@ class Patroni(AbstractPatroniDaemon):
         while True:
             try:
                 cluster = self.dcs.get_cluster()
+                if any(member.name == self.config['name'] for member in cluster.members):
+                    error_str = 'Invalid configuration, {0} is a duplicate name'.format(self.config['name'])
+                    logger.exception(error_str)
+                    raise ConfigParseError(value=error_str)
+
+                else:
+                    logger.warning('mark in da logs - nooooo duplicate')
+                logger.info(self.config)
+                logger.warning([str(mem) for mem in cluster.members])
                 if cluster and cluster.config and cluster.config.data:
                     if self.config.set_dynamic_configuration(cluster.config):
                         self.dcs.reload_config(self.config)
