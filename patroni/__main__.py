@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Patroni(AbstractPatroniDaemon):
-
-    def __init__(self, config: 'Config') -> None:
+    def __init__(self, config: "Config") -> None:
         from patroni.api import RestApiServer
         from patroni.dcs import get_dcs
         from patroni.ha import Ha
@@ -37,8 +36,8 @@ class Patroni(AbstractPatroniDaemon):
         self.watchdog = Watchdog(self.config)
         self.load_dynamic_configuration()
 
-        self.postgresql = Postgresql(self.config['postgresql'])
-        self.api = RestApiServer(self, self.config['restapi'])
+        self.postgresql = Postgresql(self.config["postgresql"])
+        self.api = RestApiServer(self, self.config["restapi"])
         self.ha = Ha(self)
 
         self.tags = self.get_tags()
@@ -47,6 +46,7 @@ class Patroni(AbstractPatroniDaemon):
 
     def load_dynamic_configuration(self) -> None:
         from patroni.exceptions import DCSError
+
         while True:
             try:
                 cluster = self.dcs.get_cluster()
@@ -54,13 +54,17 @@ class Patroni(AbstractPatroniDaemon):
                     if self.config.set_dynamic_configuration(cluster.config):
                         self.dcs.reload_config(self.config)
                         self.watchdog.reload_config(self.config)
-                elif not self.config.dynamic_configuration and 'bootstrap' in self.config:
-                    if self.config.set_dynamic_configuration(self.config['bootstrap']['dcs']):
+                elif (
+                    not self.config.dynamic_configuration and "bootstrap" in self.config
+                ):
+                    if self.config.set_dynamic_configuration(
+                        self.config["bootstrap"]["dcs"]
+                    ):
                         self.dcs.reload_config(self.config)
                         self.watchdog.reload_config(self.config)
                 break
             except DCSError:
-                logger.warning('Can not get cluster from dcs')
+                logger.warning("Can not get cluster from dcs")
                 time.sleep(5)
 
     def ensure_unique_name(self) -> None:
@@ -70,49 +74,75 @@ class Patroni(AbstractPatroniDaemon):
         cluster = self.dcs.get_cluster()
         if not cluster:
             return
-        member = cluster.get_member(self.config['name'], False)
+        member = cluster.get_member(self.config["name"], False)
         if not isinstance(member, Member):
             return
         try:
             _ = self.request(member, endpoint="/liveness")
-            logger.fatal("Can't start; there is already a node named '%s' running", self.config['name'])
+            logger.fatal(
+                "Can't start; there is already a node named '%s' running",
+                self.config["name"],
+            )
             sys.exit(1)
         except Exception:
             return
 
     def get_tags(self) -> Dict[str, Any]:
-        return {tag: value for tag, value in self.config.get('tags', {}).items()
-                if tag not in ('clonefrom', 'nofailover', 'noloadbalance', 'nosync') or value}
+        return {
+            tag: value
+            for tag, value in self.config.get("tags", {}).items()
+            if tag
+            not in (
+                "clonefrom",
+                "nofailover",
+                "failover_priority",
+                "noloadbalance",
+                "nosync",
+            )
+            or value
+        }
 
     @property
     def nofailover(self) -> bool:
-        return bool(self.tags.get('nofailover', False))
+        failover_priority = self.tags.get("failover_priority", None)
+        if failover_priority is not None:
+            return failover_priority <= 0
+        return bool(self.tags.get("nofailover", False))
+
+    @property
+    def failover_priority(self) -> int:
+        nofailover = self.tags.get("nofailover", None)
+        if nofailover is not None:
+            return 0 if nofailover else 1
+        return int(self.tags.get("failover_priority", 1))
 
     @property
     def nosync(self) -> bool:
-        return bool(self.tags.get('nosync', False))
+        return bool(self.tags.get("nosync", False))
 
-    def reload_config(self, sighup: bool = False, local: Optional[bool] = False) -> None:
+    def reload_config(
+        self, sighup: bool = False, local: Optional[bool] = False
+    ) -> None:
         try:
             super(Patroni, self).reload_config(sighup, local)
             if local:
                 self.tags = self.get_tags()
                 self.request.reload_config(self.config)
             if local or sighup and self.api.reload_local_certificate():
-                self.api.reload_config(self.config['restapi'])
+                self.api.reload_config(self.config["restapi"])
             self.watchdog.reload_config(self.config)
-            self.postgresql.reload_config(self.config['postgresql'], sighup)
+            self.postgresql.reload_config(self.config["postgresql"], sighup)
             self.dcs.reload_config(self.config)
         except Exception:
-            logger.exception('Failed to reload config_file=%s', self.config.config_file)
+            logger.exception("Failed to reload config_file=%s", self.config.config_file)
 
     @property
     def replicatefrom(self):
-        return self.tags.get('replicatefrom')
+        return self.tags.get("replicatefrom")
 
     @property
     def noloadbalance(self):
-        return bool(self.tags.get('noloadbalance', False))
+        return bool(self.tags.get("noloadbalance", False))
 
     def schedule_next_run(self) -> None:
         self.next_run += self.dcs.loop_wait
@@ -135,11 +165,15 @@ class Patroni(AbstractPatroniDaemon):
     def _run_cycle(self) -> None:
         logger.info(self.ha.run_cycle())
 
-        if self.dcs.cluster and self.dcs.cluster.config and self.dcs.cluster.config.data \
-                and self.config.set_dynamic_configuration(self.dcs.cluster.config):
+        if (
+            self.dcs.cluster
+            and self.dcs.cluster.config
+            and self.dcs.cluster.config.data
+            and self.config.set_dynamic_configuration(self.dcs.cluster.config)
+        ):
             self.reload_config()
 
-        if self.postgresql.role != 'uninitialized':
+        if self.postgresql.role != "uninitialized":
             self.config.save_cache()
 
         self.schedule_next_run()
@@ -148,11 +182,11 @@ class Patroni(AbstractPatroniDaemon):
         try:
             self.api.shutdown()
         except Exception:
-            logger.exception('Exception during RestApi.shutdown')
+            logger.exception("Exception during RestApi.shutdown")
         try:
             self.ha.shutdown()
         except Exception:
-            logger.exception('Exception during Ha.shutdown')
+            logger.exception("Exception during Ha.shutdown")
 
 
 def patroni_main(configfile: str) -> None:
@@ -164,7 +198,9 @@ def patroni_main(configfile: str) -> None:
 
 def process_arguments() -> Namespace:
     parser = get_base_arg_parser()
-    parser.add_argument('--validate-config', action='store_true', help='Run config validator and exit')
+    parser.add_argument(
+        "--validate-config", action="store_true", help="Run config validator and exit"
+    )
     args = parser.parse_args()
 
     if args.validate_config:
@@ -192,6 +228,7 @@ def main() -> None:
 
     # Patroni started with PID=1, it looks like we are in the container
     from types import FrameType
+
     pid = 0
 
     # Looks like we are in a docker, so we will act like init
@@ -202,7 +239,7 @@ def main() -> None:
                 if ret == (0, 0):
                     break
                 elif ret[0] != pid:
-                    logger.info('Reaped pid=%s, exit status=%s', *ret)
+                    logger.info("Reaped pid=%s, exit status=%s", *ret)
         except OSError:
             pass
 
@@ -210,7 +247,7 @@ def main() -> None:
         if pid:
             os.kill(pid, signo)
 
-    if os.name != 'nt':
+    if os.name != "nt":
         signal.signal(signal.SIGCHLD, sigchld_handler)
         signal.signal(signal.SIGHUP, passtochild)
         signal.signal(signal.SIGQUIT, passtochild)
@@ -221,11 +258,12 @@ def main() -> None:
     signal.signal(signal.SIGTERM, passtochild)
 
     import multiprocessing
+
     patroni = multiprocessing.Process(target=patroni_main, args=(args.configfile,))
     patroni.start()
     pid = patroni.pid
     patroni.join()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

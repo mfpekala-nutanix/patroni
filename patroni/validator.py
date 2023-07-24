@@ -11,7 +11,16 @@ import shutil
 import socket
 import subprocess
 
-from typing import Any, Dict, Union, Iterator, List, Optional as OptionalType, Tuple, TYPE_CHECKING
+from typing import (
+    Any,
+    Dict,
+    Union,
+    Iterator,
+    List,
+    Optional as OptionalType,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 from .collections import CaseInsensitiveSet
 from .dcs import dcs_modules
@@ -45,11 +54,15 @@ def validate_connect_address(address: str) -> bool:
     except (AttributeError, TypeError, ValueError):
         raise ConfigParseError("contains a wrong value")
     if host in ["127.0.0.1", "0.0.0.0", "*", "::1", "localhost"]:
-        raise ConfigParseError('must not contain "127.0.0.1", "0.0.0.0", "*", "::1", "localhost"')
+        raise ConfigParseError(
+            'must not contain "127.0.0.1", "0.0.0.0", "*", "::1", "localhost"'
+        )
     return True
 
 
-def validate_host_port(host_port: str, listen: bool = False, multiple_hosts: bool = False) -> bool:
+def validate_host_port(
+    host_port: str, listen: bool = False, multiple_hosts: bool = False
+) -> bool:
     """Check if host(s) and port are valid and available for usage.
 
     :param host_port: the host(s) and port to be validated. It can be in either of these formats
@@ -80,16 +93,25 @@ def validate_host_port(host_port: str, listen: bool = False, multiple_hosts: boo
             if len(hosts) != 1:
                 raise ConfigParseError("expecting '*' alone")
             # If host is set to "*" get all hostnames and/or IP addresses that the host would be able to listen to
-            hosts = [p[-1][0] for p in socket.getaddrinfo(None, port, 0, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)]
+            hosts = [
+                p[-1][0]
+                for p in socket.getaddrinfo(
+                    None, port, 0, socket.SOCK_STREAM, 0, socket.AI_PASSIVE
+                )
+            ]
         for host in hosts:
             # Check if "socket.IF_INET" or "socket.IF_INET6" is being used and instantiate a socket with the identified
             # protocol
-            proto = socket.getaddrinfo(host, "", 0, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)
+            proto = socket.getaddrinfo(
+                host, "", 0, socket.SOCK_STREAM, 0, socket.AI_PASSIVE
+            )
             s = socket.socket(proto[0][0], socket.SOCK_STREAM)
             try:
                 if s.connect_ex((host, port)) == 0:
                     if listen:
-                        raise ConfigParseError("Port {} is already in use.".format(port))
+                        raise ConfigParseError(
+                            "Port {} is already in use.".format(port)
+                        )
                 elif not listen:
                     raise ConfigParseError("{} is not reachable".format(host_port))
             except socket.gaierror as e:
@@ -184,7 +206,9 @@ def get_bin_name(bin_name: str) -> str:
 
     :returns: value of ``postgresql.bin_name[*bin_name*]``, if present, otherwise *bin_name*.
     """
-    return (schema.data.get('postgresql', {}).get('bin_name', {}) or {}).get(bin_name, bin_name)
+    return (schema.data.get("postgresql", {}).get("bin_name", {}) or {}).get(
+        bin_name, bin_name
+    )
 
 
 def get_major_version(bin_dir: OptionalType[str] = None) -> str:
@@ -202,14 +226,18 @@ def get_major_version(bin_dir: OptionalType[str] = None) -> str:
         * Returns `15` for PostgreSQL 15.2
     """
     if not bin_dir:
-        binary = get_bin_name('postgres')
+        binary = get_bin_name("postgres")
     else:
-        binary = os.path.join(bin_dir, get_bin_name('postgres'))
-    version = subprocess.check_output([binary, '--version']).decode()
-    version = re.match(r'^[^\s]+ [^\s]+ (\d+)(\.(\d+))?', version)
+        binary = os.path.join(bin_dir, get_bin_name("postgres"))
+    version = subprocess.check_output([binary, "--version"]).decode()
+    version = re.match(r"^[^\s]+ [^\s]+ (\d+)(\.(\d+))?", version)
     if TYPE_CHECKING:  # pragma: no cover
         assert version is not None
-    return '.'.join([version.group(1), version.group(3)]) if int(version.group(1)) < 10 else version.group(1)
+    return (
+        ".".join([version.group(1), version.group(3)])
+        if int(version.group(1)) < 10
+        else version.group(1)
+    )
 
 
 def validate_data_dir(data_dir: str) -> bool:
@@ -241,15 +269,19 @@ def validate_data_dir(data_dir: str) -> bool:
         else:
             with open(os.path.join(data_dir, "PG_VERSION"), "r") as version:
                 pgversion = version.read().strip()
-            waldir = ("pg_wal" if float(pgversion) >= 10 else "pg_xlog")
+            waldir = "pg_wal" if float(pgversion) >= 10 else "pg_xlog"
             if not os.path.isdir(os.path.join(data_dir, waldir)):
-                raise ConfigParseError("data dir for the cluster is not empty, but doesn't contain"
-                                       " \"{}\" directory".format(waldir))
+                raise ConfigParseError(
+                    "data dir for the cluster is not empty, but doesn't contain"
+                    ' "{}" directory'.format(waldir)
+                )
             bin_dir = schema.data.get("postgresql", {}).get("bin_dir", None)
             major_version = get_major_version(bin_dir)
             if pgversion != major_version:
-                raise ConfigParseError("data_dir directory postgresql version ({}) doesn't match with "
-                                       "'postgres --version' output ({})".format(pgversion, major_version))
+                raise ConfigParseError(
+                    "data_dir directory postgresql version ({}) doesn't match with "
+                    "'postgres --version' output ({})".format(pgversion, major_version)
+                )
     return True
 
 
@@ -279,9 +311,11 @@ def validate_binary_name(bin_name: str) -> bool:
     """
     if not bin_name:
         raise ConfigParseError("is an empty string")
-    bin_dir = schema.data.get('postgresql', {}).get('bin_dir', None)
+    bin_dir = schema.data.get("postgresql", {}).get("bin_dir", None)
     if not shutil.which(bin_name, path=bin_dir):
-        raise ConfigParseError(f"does not contain '{bin_name}' in '{bin_dir or '$PATH'}'")
+        raise ConfigParseError(
+            f"does not contain '{bin_name}' in '{bin_dir or '$PATH'}'"
+        )
     return True
 
 
@@ -295,8 +329,14 @@ class Result(object):
     :ivar error: error message if the validation failed, otherwise ``None``.
     """
 
-    def __init__(self, status: bool, error: OptionalType[str] = "didn't pass validation", level: int = 0,
-                 path: str = "", data: Any = "") -> None:
+    def __init__(
+        self,
+        status: bool,
+        error: OptionalType[str] = "didn't pass validation",
+        level: int = 0,
+        path: str = "",
+        data: Any = "",
+    ) -> None:
         """Create a :class:`Result` object based on the given arguments.
 
         .. note::
@@ -321,7 +361,9 @@ class Result(object):
 
     def __repr__(self) -> str:
         """Show configuration path and value. If the validation failed, also show the error message."""
-        return str(self.path) + (" " + str(self.data) + " " + str(self._error) if self.error else "")
+        return str(self.path) + (
+            " " + str(self.data) + " " + str(self._error) if self.error else ""
+        )
 
 
 class Case(object):
@@ -406,8 +448,11 @@ class Directory(object):
     :param contains_executable: list of executable files that should exist directly under a given directory.
     """
 
-    def __init__(self, contains: OptionalType[List[str]] = None,
-                 contains_executable: OptionalType[List[str]] = None) -> None:
+    def __init__(
+        self,
+        contains: OptionalType[List[str]] = None,
+        contains_executable: OptionalType[List[str]] = None,
+    ) -> None:
         """Create a :class:`Directory` object.
 
         :param contains: list of paths that should exist relative to a given directory.
@@ -426,7 +471,9 @@ class Directory(object):
         """
         for program in self.contains_executable or []:
             if not shutil.which(program, path=path):
-                yield Result(False, f"does not contain '{program}' in '{(path or '$PATH')}'")
+                yield Result(
+                    False, f"does not contain '{program}' in '{(path or '$PATH')}'"
+                )
 
     def validate(self, name: str) -> Iterator[Result]:
         """Check if the expected paths and executables can be found under *name* directory.
@@ -445,7 +492,9 @@ class Directory(object):
             if self.contains:
                 for path in self.contains:
                     if not os.path.exists(os.path.join(name, path)):
-                        yield Result(False, "'{}' does not contain '{}'".format(name, path))
+                        yield Result(
+                            False, "'{}' does not contain '{}'".format(name, path)
+                        )
             yield from self._check_executables(path=name)
 
 
@@ -460,7 +509,14 @@ class BinDirectory(Directory):
 
     # ``pg_rewind`` is not in the list because its usage by Patroni is optional. Also, it is not available by default on
     # Postgres 9.3 and 9.4, versions which Patroni supports.
-    BINARIES = ["pg_ctl", "initdb", "pg_controldata", "pg_basebackup", "postgres", "pg_isready"]
+    BINARIES = [
+        "pg_ctl",
+        "initdb",
+        "pg_controldata",
+        "pg_basebackup",
+        "postgres",
+        "pg_isready",
+    ]
 
     def validate(self, name: str) -> Iterator[Result]:
         """Check if the expected executables can be found under *name* binary directory.
@@ -470,7 +526,9 @@ class BinDirectory(Directory):
 
         :yields: objects with the error message related to the failure, if any check fails.
         """
-        self.contains_executable: List[str] = [get_bin_name(binary) for binary in self.BINARIES]
+        self.contains_executable: List[str] = [
+            get_bin_name(binary) for binary in self.BINARIES
+        ]
         yield from super().validate(name)
 
 
@@ -595,30 +653,54 @@ class Schema(object):
         # we are dealing with an actual value validation. The remaining logic in this method is used to iterate through
         # iterable objects in the structure, until we eventually reach a leaf node to validate its value.
         if isinstance(self.validator, str):
-            yield Result(isinstance(self.data, str), "is not a string", level=1, data=self.data)
+            yield Result(
+                isinstance(self.data, str), "is not a string", level=1, data=self.data
+            )
         elif issubclass(type(self.validator), type):
             validator = self.validator
             if self.validator == str:
                 validator = str
-            yield Result(isinstance(self.data, validator),
-                         "is not {}".format(_get_type_name(self.validator)), level=1, data=self.data)
+            yield Result(
+                isinstance(self.data, validator),
+                "is not {}".format(_get_type_name(self.validator)),
+                level=1,
+                data=self.data,
+            )
         elif callable(self.validator):
             if hasattr(self.validator, "expected_type"):
                 if not isinstance(data, self.validator.expected_type):
-                    yield Result(False, "is not {}"
-                                 .format(_get_type_name(self.validator.expected_type)), level=1, data=self.data)
+                    yield Result(
+                        False,
+                        "is not {}".format(
+                            _get_type_name(self.validator.expected_type)
+                        ),
+                        level=1,
+                        data=self.data,
+                    )
                     return
             try:
                 self.validator(data)
                 yield Result(True, data=self.data)
             except Exception as e:
-                yield Result(False, "didn't pass validation: {}".format(e), data=self.data)
+                yield Result(
+                    False, "didn't pass validation: {}".format(e), data=self.data
+                )
         elif isinstance(self.validator, dict):
             if not isinstance(self.data, dict):
-                yield Result(isinstance(self.data, dict), "is not a dictionary", level=1, data=self.data)
+                yield Result(
+                    isinstance(self.data, dict),
+                    "is not a dictionary",
+                    level=1,
+                    data=self.data,
+                )
         elif isinstance(self.validator, list):
             if not isinstance(self.data, list):
-                yield Result(isinstance(self.data, list), "is not a list", level=1, data=self.data)
+                yield Result(
+                    isinstance(self.data, list),
+                    "is not a list",
+                    level=1,
+                    data=self.data,
+                )
                 return
         yield from self.iter()
 
@@ -645,8 +727,13 @@ class Schema(object):
                     # `list`. For example: "pg_hba": [str] in `validator` attribute defines that "pg_hba" in `data`
                     # attribute should contain a list with one or more `str` entries.
                     for v in Schema(self.validator[0]).validate(value):
-                        yield Result(v.status, v.error,
-                                     path=(str(key) + ("." + v.path if v.path else "")), level=v.level, data=value)
+                        yield Result(
+                            v.status,
+                            v.error,
+                            path=(str(key) + ("." + v.path if v.path else "")),
+                            level=v.level,
+                            data=value,
+                        )
         elif isinstance(self.validator, Directory):
             yield from self.validator.validate(self.data)
         elif isinstance(self.validator, Or):
@@ -663,7 +750,11 @@ class Schema(object):
             for d in self._data_key(key):
                 if d not in self.data and not isinstance(key, Optional):
                     yield Result(False, "is not defined.", path=d)
-                elif d not in self.data and isinstance(key, Optional) and key.default is None:
+                elif (
+                    d not in self.data
+                    and isinstance(key, Optional)
+                    and key.default is None
+                ):
                     continue
                 else:
                     if d not in self.data and isinstance(key, Optional):
@@ -674,8 +765,13 @@ class Schema(object):
                     # In this loop we may be calling a new `Schema` either over an intermediate node in the tree, or
                     # over a leaf node. In the latter case the recursive calls in the given path will finish.
                     for v in Schema(validator).validate(self.data[d]):
-                        yield Result(v.status, v.error,
-                                     path=(d + ("." + v.path if v.path else "")), level=v.level, data=v.data)
+                        yield Result(
+                            v.status,
+                            v.error,
+                            path=(d + ("." + v.path if v.path else "")),
+                            level=v.level,
+                            data=v.data,
+                        )
 
     def iter_or(self) -> Iterator[Result]:
         """Perform all validations defined in an `Or` object for a given configuration option.
@@ -743,8 +839,14 @@ def _get_type_name(python_type: Any) -> str:
     Returns:
         User friendly name of the given Python type.
     """
-    types: Dict[Any, str] = {str: 'a string', int: 'an integer', float: 'a number',
-                             bool: 'a boolean', list: 'an array', dict: 'a dictionary'}
+    types: Dict[Any, str] = {
+        str: "a string",
+        int: "an integer",
+        float: "a number",
+        bool: "a boolean",
+        list: "an array",
+        dict: "a dictionary",
+    }
     return types.get(python_type, getattr(python_type, __name__, "unknown type"))
 
 
@@ -771,8 +873,13 @@ class IntValidator(object):
 
     expected_type = int
 
-    def __init__(self, min: OptionalType[int] = None, max: OptionalType[int] = None,
-                 base_unit: OptionalType[str] = None, raise_assert: bool = False) -> None:
+    def __init__(
+        self,
+        min: OptionalType[int] = None,
+        max: OptionalType[int] = None,
+        base_unit: OptionalType[str] = None,
+        raise_assert: bool = False,
+    ) -> None:
         """Create an :class:`IntValidator` object with the given rules.
 
         :param min: minimum allowed value for the setting, if any.
@@ -794,9 +901,11 @@ class IntValidator(object):
         :returns: ``True`` if *value* is valid and within the expected range.
         """
         value = parse_int(value, self.base_unit) or ""
-        ret = isinstance(value, int)\
-            and (self.min is None or value >= self.min)\
+        ret = (
+            isinstance(value, int)
+            and (self.min is None or value >= self.min)
             and (self.max is None or value <= self.max)
+        )
 
         if self.raise_assert:
             assert_(ret)
@@ -810,15 +919,23 @@ class EnumValidator(object):
     :ivar raise_assert: if an ``assert`` call should be performed regarding expected type and valid range.
     """
 
-    def __init__(self, allowed_values: Tuple[str, ...],
-                 case_sensitive: bool = False, raise_assert: bool = False) -> None:
+    def __init__(
+        self,
+        allowed_values: Tuple[str, ...],
+        case_sensitive: bool = False,
+        raise_assert: bool = False,
+    ) -> None:
         """Create an :class:`EnumValidator` object with given allowed values.
 
         :param allowed_values: a tuple with allowed enum values
         :param case_sensitive: set to ``True`` to do case sensitive comparisons
         :param raise_assert: if an ``assert`` call should be performed regarding expected values.
         """
-        self.allowed_values = set(allowed_values) if case_sensitive else CaseInsensitiveSet(allowed_values)
+        self.allowed_values = (
+            set(allowed_values)
+            if case_sensitive
+            else CaseInsensitiveSet(allowed_values)
+        )
         self.raise_assert = raise_assert
 
     def __call__(self, value: str) -> bool:
@@ -847,203 +964,203 @@ def validate_watchdog_mode(value: Any) -> None:
 
 userattributes = {"username": "", Optional("password"): ""}
 available_dcs = [m.split(".")[-1] for m in dcs_modules()]
-setattr(validate_host_port_list, 'expected_type', list)
-setattr(comma_separated_host_port, 'expected_type', str)
-setattr(validate_connect_address, 'expected_type', str)
-setattr(validate_host_port_listen, 'expected_type', str)
-setattr(validate_host_port_listen_multiple_hosts, 'expected_type', str)
-setattr(validate_data_dir, 'expected_type', str)
-setattr(validate_binary_name, 'expected_type', str)
+setattr(validate_host_port_list, "expected_type", list)
+setattr(comma_separated_host_port, "expected_type", str)
+setattr(validate_connect_address, "expected_type", str)
+setattr(validate_host_port_listen, "expected_type", str)
+setattr(validate_host_port_listen_multiple_hosts, "expected_type", str)
+setattr(validate_data_dir, "expected_type", str)
+setattr(validate_binary_name, "expected_type", str)
 validate_etcd = {
-    Or("host", "hosts", "srv", "srv_suffix", "url", "proxy"): Case({
-        "host": validate_host_port,
-        "hosts": Or(comma_separated_host_port, [validate_host_port]),
-        "srv": str,
-        "srv_suffix": str,
-        "url": str,
-        "proxy": str
-    }),
+    Or("host", "hosts", "srv", "srv_suffix", "url", "proxy"): Case(
+        {
+            "host": validate_host_port,
+            "hosts": Or(comma_separated_host_port, [validate_host_port]),
+            "srv": str,
+            "srv_suffix": str,
+            "url": str,
+            "proxy": str,
+        }
+    ),
     Optional("protocol"): str,
     Optional("username"): str,
     Optional("password"): str,
     Optional("cacert"): str,
     Optional("cert"): str,
-    Optional("key"): str
+    Optional("key"): str,
 }
 
-schema = Schema({
-    "name": str,
-    "scope": str,
-    Optional("ctl"): {
-        Optional("insecure"): bool,
-        Optional("cacert"): str,
-        Optional("certfile"): str,
-        Optional("keyfile"): str,
-        Optional("keyfile_password"): str
-    },
-    "restapi": {
-        "listen": validate_host_port_listen,
-        "connect_address": validate_connect_address,
-        Optional("authentication"): {
-            "username": str,
-            "password": str
+schema = Schema(
+    {
+        "name": str,
+        "scope": str,
+        Optional("ctl"): {
+            Optional("insecure"): bool,
+            Optional("cacert"): str,
+            Optional("certfile"): str,
+            Optional("keyfile"): str,
+            Optional("keyfile_password"): str,
         },
-        Optional("certfile"): str,
-        Optional("keyfile"): str,
-        Optional("keyfile_password"): str,
-        Optional("cafile"): str,
-        Optional("ciphers"): str,
-        Optional("verify_client"): EnumValidator(("none", "optional", "required"),
-                                                 case_sensitive=True, raise_assert=True),
-        Optional("allowlist"): [str],
-        Optional("allowlist_include_members"): bool,
-        Optional("http_extra_headers"): dict,
-        Optional("https_extra_headers"): dict,
-        Optional("request_queue_size"): IntValidator(min=0, max=4096, raise_assert=True)
-    },
-    Optional("bootstrap"): {
-        "dcs": {
-            Optional("ttl"): int,
-            Optional("loop_wait"): int,
-            Optional("retry_timeout"): int,
-            Optional("maximum_lag_on_failover"): int,
-            Optional("maximum_lag_on_syncnode"): int,
-            Optional("postgresql"): {
-                Optional("parameters"): {
-                    Optional("max_connections"): int,
-                    Optional("max_locks_per_transaction"): int,
-                    Optional("max_prepared_transactions"): int,
-                    Optional("max_replication_slots"): int,
-                    Optional("max_wal_senders"): int,
-                    Optional("max_worker_processes"): int
+        "restapi": {
+            "listen": validate_host_port_listen,
+            "connect_address": validate_connect_address,
+            Optional("authentication"): {"username": str, "password": str},
+            Optional("certfile"): str,
+            Optional("keyfile"): str,
+            Optional("keyfile_password"): str,
+            Optional("cafile"): str,
+            Optional("ciphers"): str,
+            Optional("verify_client"): EnumValidator(
+                ("none", "optional", "required"), case_sensitive=True, raise_assert=True
+            ),
+            Optional("allowlist"): [str],
+            Optional("allowlist_include_members"): bool,
+            Optional("http_extra_headers"): dict,
+            Optional("https_extra_headers"): dict,
+            Optional("request_queue_size"): IntValidator(
+                min=0, max=4096, raise_assert=True
+            ),
+        },
+        Optional("bootstrap"): {
+            "dcs": {
+                Optional("ttl"): int,
+                Optional("loop_wait"): int,
+                Optional("retry_timeout"): int,
+                Optional("maximum_lag_on_failover"): int,
+                Optional("maximum_lag_on_syncnode"): int,
+                Optional("postgresql"): {
+                    Optional("parameters"): {
+                        Optional("max_connections"): int,
+                        Optional("max_locks_per_transaction"): int,
+                        Optional("max_prepared_transactions"): int,
+                        Optional("max_replication_slots"): int,
+                        Optional("max_wal_senders"): int,
+                        Optional("max_worker_processes"): int,
+                    },
+                    Optional("use_pg_rewind"): bool,
+                    Optional("pg_hba"): [str],
+                    Optional("pg_ident"): [str],
+                    Optional("pg_ctl_timeout"): int,
+                    Optional("use_slots"): bool,
                 },
-                Optional("use_pg_rewind"): bool,
-                Optional("pg_hba"): [str],
-                Optional("pg_ident"): [str],
-                Optional("pg_ctl_timeout"): int,
-                Optional("use_slots"): bool,
+                Optional("primary_start_timeout"): int,
+                Optional("primary_stop_timeout"): int,
+                Optional("standby_cluster"): {
+                    Or("host", "port", "restore_command"): Case(
+                        {"host": str, "port": int, "restore_command": str}
+                    ),
+                    Optional("primary_slot_name"): str,
+                    Optional("create_replica_methods"): [str],
+                    Optional("archive_cleanup_command"): str,
+                    Optional("recovery_min_apply_delay"): str,
+                },
+                Optional("synchronous_mode"): bool,
+                Optional("synchronous_mode_strict"): bool,
+                Optional("synchronous_node_count"): int,
             },
-            Optional("primary_start_timeout"): int,
-            Optional("primary_stop_timeout"): int,
-            Optional("standby_cluster"): {
-                Or("host", "port", "restore_command"): Case({
-                    "host": str,
-                    "port": int,
-                    "restore_command": str
-                }),
-                Optional("primary_slot_name"): str,
-                Optional("create_replica_methods"): [str],
-                Optional("archive_cleanup_command"): str,
-                Optional("recovery_min_apply_delay"): str
+            Optional("initdb"): [Or(str, dict)],
+            Optional("method"): str,
+        },
+        Or(*available_dcs): Case(
+            {
+                "consul": {
+                    Or("host", "url"): Case({"host": validate_host_port, "url": str}),
+                    Optional("port"): int,
+                    Optional("scheme"): str,
+                    Optional("token"): str,
+                    Optional("verify"): bool,
+                    Optional("cacert"): str,
+                    Optional("cert"): str,
+                    Optional("key"): str,
+                    Optional("dc"): str,
+                    Optional("checks"): [str],
+                    Optional("register_service"): bool,
+                    Optional("service_tags"): [str],
+                    Optional("service_check_interval"): str,
+                    Optional("service_check_tls_server_name"): str,
+                    Optional("consistency"): EnumValidator(
+                        ("default", "consistent", "stale"),
+                        case_sensitive=True,
+                        raise_assert=True,
+                    ),
+                },
+                "etcd": validate_etcd,
+                "etcd3": validate_etcd,
+                "exhibitor": {
+                    "hosts": [str],
+                    "port": IntValidator(max=65535, raise_assert=True),
+                    Optional("pool_interval"): int,
+                },
+                "raft": {
+                    "self_addr": validate_connect_address,
+                    Optional("bind_addr"): validate_host_port_listen,
+                    "partner_addrs": validate_host_port_list,
+                    Optional("data_dir"): str,
+                    Optional("password"): str,
+                },
+                "zookeeper": {
+                    "hosts": Or(comma_separated_host_port, [validate_host_port]),
+                    Optional("use_ssl"): bool,
+                    Optional("cacert"): str,
+                    Optional("cert"): str,
+                    Optional("key"): str,
+                    Optional("key_password"): str,
+                    Optional("verify"): bool,
+                    Optional("set_acls"): dict,
+                },
+                "kubernetes": {
+                    "labels": {},
+                    Optional("bypass_api_service"): bool,
+                    Optional("namespace"): str,
+                    Optional("scope_label"): str,
+                    Optional("role_label"): str,
+                    Optional("use_endpoints"): bool,
+                    Optional("pod_ip"): Or(is_ipv4_address, is_ipv6_address),
+                    Optional("ports"): [{"name": str, "port": int}],
+                    Optional("cacert"): str,
+                    Optional("retriable_http_codes"): Or(int, [int]),
+                },
+            }
+        ),
+        Optional("citus"): {"database": str, "group": int},
+        "postgresql": {
+            "listen": validate_host_port_listen_multiple_hosts,
+            "connect_address": validate_connect_address,
+            Optional("proxy_address"): validate_connect_address,
+            "authentication": {
+                "replication": userattributes,
+                "superuser": userattributes,
+                Optional("rewind"): userattributes,
             },
-            Optional("synchronous_mode"): bool,
-            Optional("synchronous_mode_strict"): bool,
-            Optional("synchronous_node_count"): int
+            "data_dir": validate_data_dir,
+            Optional("bin_name"): {
+                Optional("pg_ctl"): validate_binary_name,
+                Optional("initdb"): validate_binary_name,
+                Optional("pg_controldata"): validate_binary_name,
+                Optional("pg_basebackup"): validate_binary_name,
+                Optional("postgres"): validate_binary_name,
+                Optional("pg_isready"): validate_binary_name,
+                Optional("pg_rewind"): validate_binary_name,
+            },
+            Optional("bin_dir", ""): BinDirectory(),
+            Optional("parameters"): {Optional("unix_socket_directories"): str},
+            Optional("pg_hba"): [str],
+            Optional("pg_ident"): [str],
+            Optional("pg_ctl_timeout"): int,
+            Optional("use_pg_rewind"): bool,
         },
-        Optional("initdb"): [Or(str, dict)],
-        Optional("method"): str
-    },
-    Or(*available_dcs): Case({
-        "consul": {
-            Or("host", "url"): Case({
-                "host": validate_host_port,
-                "url": str
-            }),
-            Optional("port"): int,
-            Optional("scheme"): str,
-            Optional("token"): str,
-            Optional("verify"): bool,
-            Optional("cacert"): str,
-            Optional("cert"): str,
-            Optional("key"): str,
-            Optional("dc"): str,
-            Optional("checks"): [str],
-            Optional("register_service"): bool,
-            Optional("service_tags"): [str],
-            Optional("service_check_interval"): str,
-            Optional("service_check_tls_server_name"): str,
-            Optional("consistency"): EnumValidator(('default', 'consistent', 'stale'),
-                                                   case_sensitive=True, raise_assert=True)
+        Optional("watchdog"): {
+            Optional("mode"): validate_watchdog_mode,
+            Optional("device"): str,
+            Optional("safety_margin"): int,
         },
-        "etcd": validate_etcd,
-        "etcd3": validate_etcd,
-        "exhibitor": {
-            "hosts": [str],
-            "port": IntValidator(max=65535, raise_assert=True),
-            Optional("pool_interval"): int
+        Optional("tags"): {
+            Optional("nofailover"): bool,
+            Optional("failover_priority"): int,
+            Optional("clonefrom"): bool,
+            Optional("noloadbalance"): bool,
+            Optional("replicatefrom"): str,
+            Optional("nosync"): bool,
         },
-        "raft": {
-            "self_addr": validate_connect_address,
-            Optional("bind_addr"): validate_host_port_listen,
-            "partner_addrs": validate_host_port_list,
-            Optional("data_dir"): str,
-            Optional("password"): str
-        },
-        "zookeeper": {
-            "hosts": Or(comma_separated_host_port, [validate_host_port]),
-            Optional("use_ssl"): bool,
-            Optional("cacert"): str,
-            Optional("cert"): str,
-            Optional("key"): str,
-            Optional("key_password"): str,
-            Optional("verify"): bool,
-            Optional("set_acls"): dict
-        },
-        "kubernetes": {
-            "labels": {},
-            Optional("bypass_api_service"): bool,
-            Optional("namespace"): str,
-            Optional("scope_label"): str,
-            Optional("role_label"): str,
-            Optional("use_endpoints"): bool,
-            Optional("pod_ip"): Or(is_ipv4_address, is_ipv6_address),
-            Optional("ports"): [{"name": str, "port": int}],
-            Optional("cacert"): str,
-            Optional("retriable_http_codes"): Or(int, [int]),
-        },
-    }),
-    Optional("citus"): {
-        "database": str,
-        "group": int
-    },
-    "postgresql": {
-        "listen": validate_host_port_listen_multiple_hosts,
-        "connect_address": validate_connect_address,
-        Optional("proxy_address"): validate_connect_address,
-        "authentication": {
-            "replication": userattributes,
-            "superuser": userattributes,
-            Optional("rewind"): userattributes
-        },
-        "data_dir": validate_data_dir,
-        Optional("bin_name"): {
-            Optional("pg_ctl"): validate_binary_name,
-            Optional("initdb"): validate_binary_name,
-            Optional("pg_controldata"): validate_binary_name,
-            Optional("pg_basebackup"): validate_binary_name,
-            Optional("postgres"): validate_binary_name,
-            Optional("pg_isready"): validate_binary_name,
-            Optional("pg_rewind"): validate_binary_name,
-        },
-        Optional("bin_dir", ""): BinDirectory(),
-        Optional("parameters"): {
-            Optional("unix_socket_directories"): str
-        },
-        Optional("pg_hba"): [str],
-        Optional("pg_ident"): [str],
-        Optional("pg_ctl_timeout"): int,
-        Optional("use_pg_rewind"): bool
-    },
-    Optional("watchdog"): {
-        Optional("mode"): validate_watchdog_mode,
-        Optional("device"): str,
-        Optional("safety_margin"): int
-    },
-    Optional("tags"): {
-        Optional("nofailover"): bool,
-        Optional("clonefrom"): bool,
-        Optional("noloadbalance"): bool,
-        Optional("replicatefrom"): str,
-        Optional("nosync"): bool
     }
-})
+)

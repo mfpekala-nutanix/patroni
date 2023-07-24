@@ -83,3 +83,17 @@ Feature: basic replication
   Scenario: check graceful rejection when two nodes have the same name
     Given I start duplicate postgres0 on port 8011
     Then there is a "Can't start; there is already a node named 'postgres0' running" CRITICAL in the dup-postgres0 patroni log
+
+  Scenario: check failover priority 0 prevents leaderships
+    Given I start postgres0
+    Given I start postgres1
+    Given I start postgres2
+    Given I issue a PATCH request to http://127.0.0.1:8008/config with {"failover_priority": 0}
+    Then I receive a response code 200
+    Given I issue a PATCH request to http://127.0.0.1:8009/config with {"failover_priority": 0}
+    Then I receive a response code 200
+    Given I issue a PATCH request to http://127.0.0.1:8010/config with {"failover_priority": 0}
+    Then I receive a response code 200
+    Then "members/pe0" key in DCS has failover_priority=1 after 10 seconds
+    Then "members/pe1" key in DCS has failover_priority=0 after 10 seconds
+    Then "members/pe2" key in DCS has failover_priority=0 after 10 seconds
