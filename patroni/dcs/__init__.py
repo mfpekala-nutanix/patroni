@@ -257,7 +257,17 @@ class Member(NamedTuple):
 
     @property
     def nofailover(self) -> bool:
-        return self.tags.get('nofailover', False)
+        failover_priority = self.tags.get('failover_priority', None)
+        if failover_priority is not None:
+            return int(failover_priority) <= 0
+        return bool(self.tags.get('nofailover', False))
+    
+    @property
+    def failover_priority(self) -> int:
+        nofailover = self.tags.get('nofailover', None)
+        if nofailover is not None:
+            return 0 if nofailover else 1
+        return int(self.tags.get('failover_priority', 1))
 
     @property
     def replicatefrom(self) -> Optional[str]:

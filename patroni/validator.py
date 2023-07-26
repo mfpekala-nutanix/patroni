@@ -1045,6 +1045,7 @@ schema = Schema({
     },
     Optional("tags"): {
         Optional("nofailover"): bool,
+        Optional("failover_priority"): int,
         Optional("clonefrom"): bool,
         Optional("noloadbalance"): bool,
         Optional("replicatefrom"): str,

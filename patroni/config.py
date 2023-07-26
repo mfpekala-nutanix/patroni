@@ -225,6 +225,7 @@ class Config(object):
         self._cache_file = os.path.join(self._data_dir, self.__CACHE_FILENAME)
         self._load_cache()
         self._cache_needs_saving = False
+        self._validate_failover_tags()
 
     @property
     def config_file(self) -> Union[str, None]:
@@ -601,3 +602,12 @@ class Config(object):
         :returns: :class:`GlobalConfig` object
         """
         return get_global_config(cluster, self._dynamic_configuration)
+    
+    def _validate_failover_tags(self):
+        """Ensures that only one of `no_failover` and `failover_priority` is set"""
+        has_nofailover_tag = self.get('tags', {}).get('nofailover', None) is not None
+        has_failover_priority_tag = self.get('tags', {}).get('failover_priority', None) is not None
+        if has_nofailover_tag and has_failover_priority_tag:
+            raise ConfigParseError(
+                'Cannot provide values for both `nofailover` and `failover_priority`. Please set only one.'
+            )

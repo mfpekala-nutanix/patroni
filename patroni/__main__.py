@@ -81,12 +81,30 @@ class Patroni(AbstractPatroniDaemon):
             return
 
     def get_tags(self) -> Dict[str, Any]:
-        return {tag: value for tag, value in self.config.get('tags', {}).items()
-                if tag not in ('clonefrom', 'nofailover', 'noloadbalance', 'nosync') or value}
+        return {
+                tag: value for tag, value in self.config.get('tags', {}).items()
+                if tag not in (
+                    'clonefrom',
+                    'nofailover',
+                    'failover_priority',
+                    'noloadbalance',
+                    'nosync'
+                ) or value is not False
+            }
 
     @property
     def nofailover(self) -> bool:
+        failover_priority = self.tags.get('failover_priority', None)
+        if failover_priority is not None:
+            return int(failover_priority) <= 0
         return bool(self.tags.get('nofailover', False))
+    
+    @property
+    def failover_priority(self) -> int:
+        nofailover = self.tags.get('nofailover', None)
+        if nofailover is not None:
+            return 0 if nofailover else 1
+        return int(self.tags.get('failover_priority', 1))
 
     @property
     def nosync(self) -> bool:

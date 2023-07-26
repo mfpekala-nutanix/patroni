@@ -803,6 +803,33 @@ class Ha(object):
         pool.close()
         pool.join()
         return results
+    
+    def fetch_node_status_and_priority(self, member: Member) -> Tuple[_MemberStatus, int]:
+        """This function performs an http get request on member.api_url and fetches its status
+        and priority
+        :returns tuple of `_MemberStatus, int`"""
+        try:
+            response = self.patroni.request(member, timeout=2, retries=0)
+            data = response.data.decode('utf-8')
+            logger.info('Got response from %s %s: %s', member.name, member.api_url, data)
+            return (
+                _MemberStatus.from_api_response(member, json.loads(data)),
+                member.failover_priority
+            )
+        except Exception as e:
+            logger.warning('Request failed to %s: GET %s (%s)', member.name, member.api_url)
+        return (_MemberStatus.unknown(member), -1)
+    
+    def fetch_nodes_statuses_and_priorities(self, members: List[Member]) -> List[Tuple[_MemberStatus, int]]:
+        """Parallelizes fetching the status and priority from other nodes"""
+        pool = ThreadPool(len(members))
+        results = pool.map(
+            self.fetch_node_status_and_priority,
+            members
+        ) # Run API calls on members in parallel
+        pool.close()
+        pool.join()
+        return results
 
     def update_failsafe(self, data: Dict[str, Any]) -> Optional[str]:
         if self.state_handler.state == 'running' and self.state_handler.role in ('master', 'primary'):
@@ -877,10 +904,20 @@ class Ha(object):
         members = [m for m in members if m.name != self.state_handler.name and not m.nofailover and m.api_url]
 
         if members:
-            for st in self.fetch_nodes_statuses(members):
+            for st, priority in self.fetch_nodes_statuses_and_priorities(members):
                 if st.failover_limitation() is None:
                     if st.in_recovery is False:
                         logger.warning('Primary (%s) is still alive', st.member.name)
+                        return False
+                    if self.is_lagging(st.wal_position):
+                        # The other node appears to have intolerable lag, move on (regardless of priority)
+                        continue
+                    if self.get_effective_tags().get('failover_priority', 1) < priority:
+                        # There's a higher priority non-lagging replica
+                        logger.info(
+                            '%s is not lagging and has a higher priority',
+                            st.member.name
+                        )
                         return False
                     if my_wal_position < st.wal_position:
                         logger.info('Wal position of %s is ahead of my wal position', st.member.name)
