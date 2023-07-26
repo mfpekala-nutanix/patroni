@@ -261,7 +261,7 @@ class Member(NamedTuple):
         if failover_priority is not None:
             return int(failover_priority) <= 0
         return bool(self.tags.get('nofailover', False))
-    
+
     @property
     def failover_priority(self) -> int:
         nofailover = self.tags.get('nofailover', None)

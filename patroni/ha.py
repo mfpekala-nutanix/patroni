@@ -803,11 +803,12 @@ class Ha(object):
         pool.close()
         pool.join()
         return results
-    
+
     def fetch_node_status_and_priority(self, member: Member) -> Tuple[_MemberStatus, int]:
         """This function performs an http get request on member.api_url and fetches its status
         and priority
         :returns tuple of `_MemberStatus, int`"""
+
         try:
             response = self.patroni.request(member, timeout=2, retries=0)
             data = response.data.decode('utf-8')
@@ -817,16 +818,16 @@ class Ha(object):
                 member.failover_priority
             )
         except Exception as e:
-            logger.warning('Request failed to %s: GET %s (%s)', member.name, member.api_url)
+            logger.warning('Request failed to %s: GET %s (%s)', member.name, member.api_url, e)
         return (_MemberStatus.unknown(member), -1)
-    
+
     def fetch_nodes_statuses_and_priorities(self, members: List[Member]) -> List[Tuple[_MemberStatus, int]]:
         """Parallelizes fetching the status and priority from other nodes"""
         pool = ThreadPool(len(members))
         results = pool.map(
             self.fetch_node_status_and_priority,
             members
-        ) # Run API calls on members in parallel
+        )  # Run API calls on members in parallel
         pool.close()
         pool.join()
         return results

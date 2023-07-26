@@ -1,7 +1,7 @@
 import json
-import time
 
-from behave import step, then
+from behave import step
+
 
 @step('I configure and start {name:w} with tags {data}')
 def start_patroni_with_tags(context, name, data):

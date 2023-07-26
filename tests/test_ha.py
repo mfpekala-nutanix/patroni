@@ -103,6 +103,22 @@ def get_node_status(reachable=True, in_recovery=True, dcs_last_seen=0,
     return fetch_node_status
 
 
+def get_node_status_and_priority(reachable=True, in_recovery=True, dcs_last_seen=0,
+                                 timeline=2, wal_position=10, nofailover=None,
+                                 failover_priority=1, watchdog_failed=False):
+    def fetch_node_status_and_priority(e):
+        tags = {}
+        if nofailover is not None:
+            tags['nofailover'] = nofailover
+        else:
+            tags['failover_priority'] = failover_priority
+        return (
+            _MemberStatus(e, reachable, in_recovery, dcs_last_seen, timeline, wal_position, tags, watchdog_failed),
+            failover_priority
+        )
+    return fetch_node_status_and_priority
+
+
 future_restart_time = datetime.datetime.now(tzutc) + datetime.timedelta(days=5)
 postmaster_start_time = datetime.datetime.now(tzutc)
 
@@ -860,11 +876,19 @@ class TestHa(PostgresInit):
         self.ha.cluster = get_cluster_initialized_without_leader(sync=('postgresql1', self.p.name))
         self.ha.global_config = self.ha.patroni.config.get_global_config(self.ha.cluster)
         self.assertTrue(self.ha._is_healthiest_node(self.ha.old_cluster.members))
-        self.ha.fetch_node_status = get_node_status()  # accessible, in_recovery
+        self.ha.fetch_node_status_and_priority = get_node_status_and_priority()  # accessible, in_recovery
         self.assertTrue(self.ha._is_healthiest_node(self.ha.old_cluster.members))
-        self.ha.fetch_node_status = get_node_status(in_recovery=False)  # accessible, not in_recovery
+        # accessible, not in_recovery
+        self.ha.fetch_node_status_and_priority = get_node_status_and_priority(in_recovery=False)
         self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
-        self.ha.fetch_node_status = get_node_status(wal_position=11)  # accessible, in_recovery, wal position ahead
+        # accessible, in_recovery, higher priority
+        self.ha.fetch_node_status_and_priority = get_node_status_and_priority(failover_priority=2, wal_position=9)
+        self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
+        # if there is a higher-priority node but it is outside of max lag then this node should race
+        self.ha.fetch_node_status_and_priority = get_node_status_and_priority(failover_priority=6, wal_position=1)
+        self.assertTrue(self.ha._is_healthiest_node)
+        # accessible, in_recovery, wal position ahead
+        self.ha.fetch_node_status_and_priority = get_node_status_and_priority(wal_position=11)
         self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
         # in synchronous_mode consider itself healthy if the former leader is accessible in read-only and ahead of us
         with patch.object(Ha, 'is_synchronous_mode', Mock(return_value=True)):
@@ -879,7 +903,11 @@ class TestHa(PostgresInit):
             self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
         self.ha.patroni.nofailover = True
         self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
+        self.ha.patroni.nofailover = None
+        self.ha.patroni.failover_priority = 0
+        self.assertFalse(self.ha._is_healthiest_node(self.ha.old_cluster.members))
         self.ha.patroni.nofailover = False
+        self.ha.patroni.failover_priority = 1
 
     def test_fetch_node_status(self):
         member = Member(0, 'test', 1, {'api_url': 'http://127.0.0.1:8011/patroni'})
@@ -889,6 +917,29 @@ class TestHa(PostgresInit):
         self.ha.patroni.request.return_value.data = b'{"wal":{"location":1},"role":"primary"}'
         ret = self.ha.fetch_node_status(member)
         self.assertFalse(ret.in_recovery)
+
+    def test_fetch_node_status_and_priority(self):
+        member = Member(0, 'test', 1, {'api_url': 'http://localhost:8011/patroni'})
+        self.ha.fetch_node_status_and_priority(member)
+        member = Member(0, 'test', 1, {'api_url': 'http://localhost:8011/patroni'})
+        self.ha.patroni.request = Mock()
+        self.ha.patroni.request.return_value.data = b'{"wal":{"location":1},"role":"primary"}'
+        (ret, _) = self.ha.fetch_node_status_and_priority(member)
+        self.assertFalse(ret.in_recovery)
+        member = Member(0, 'test', 1, {'api_url': 'http://localhost:8011/patroni', 'tags': {'failover_priority': 6}})
+        with patch('patroni.ha.logger.info', Mock()):
+            (_, priority) = self.ha.fetch_node_status_and_priority(member)
+        self.assertEqual(priority, 6)
+
+    def test_fetch_nodes_statuses_and_priorities(self):
+        member1 = Member(0, 'test1', 1, {'api_url': 'http://localhost:8011/patroni'})
+        member2 = Member(0, 'test2', 1, {'api_url': 'http://localhost:8011/patroni'})
+        self.ha.fetch_node_status_and_priority = Mock()
+        self.ha.fetch_nodes_statuses_and_priorities([member1, member2])
+        # Ensure `fetch_node_status_and_priority` called on each member, although order may change
+        call_members = [call_args[0][0] for call_args in self.ha.fetch_node_status_and_priority.call_args_list]
+        self.assertIn(member1, call_members)
+        self.assertIn(member2, call_members)
 
     @patch.object(Rewind, 'pg_rewind', true)
     @patch.object(Rewind, 'check_leader_is_not_in_recovery', true)

@@ -307,3 +307,9 @@ class TestValidator(unittest.TestCase):
         output = "\n".join(errors)
         self.assertEqual(['postgresql.bin_dir', 'postgresql.bin_name.postgres', 'raft.bind_addr', 'raft.self_addr'],
                          parse_output(output))
+
+    def test_failover_priority_int(self, _, __):
+        c = copy.deepcopy(config)
+        c["tags"]["failover_priority"] = 'a string'
+        errors = schema(c)
+        self.assertIn('tags.failover_priority a string is not an integer', errors)

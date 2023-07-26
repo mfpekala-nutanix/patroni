@@ -179,7 +179,7 @@ class TestPatroni(unittest.TestCase):
         self.assertTrue(self.p.nofailover)
         self.p.tags['failover_priority'] = 1
         self.assertFalse(self.p.nofailover)
-    
+
     def test_failover_priority(self):
         self.p.tags['nofailover'] = None
         self.p.tags['failover_priority'] = 0

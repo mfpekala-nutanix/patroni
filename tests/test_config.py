@@ -147,3 +147,18 @@ class TestConfig(unittest.TestCase):
     @patch('os.path.isdir', Mock(return_value=False))
     def test_invalid_path(self):
         self.assertRaises(ConfigParseError, Config, 'postgres0')
+
+    def test__validate_failover_tags(self):
+        """Ensures that only one of `nofailover` or `failover_priority` can be provided"""
+        config = Config("postgres0.yml")
+        mock_get = Mock()
+        with patch.object(config, 'get', mock_get):
+            just_nofailover = {"nofailover": True}
+            mock_get.side_effect = [just_nofailover] * 2
+            self.assertIsNone(config._validate_failover_tags())
+            just_failover_priority = {"failover_priority": 1}
+            mock_get.side_effect = [just_failover_priority] * 2
+            self.assertIsNone(config._validate_failover_tags())
+            both = {"nofailover": False, "failover_priority": 1}
+            mock_get.side_effect = [both] * 2
+            self.assertRaises(ConfigParseError, config._validate_failover_tags)

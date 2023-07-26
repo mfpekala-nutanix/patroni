@@ -602,7 +602,7 @@ class Config(object):
         :returns: :class:`GlobalConfig` object
         """
         return get_global_config(cluster, self._dynamic_configuration)
-    
+
     def _validate_failover_tags(self):
         """Ensures that only one of `no_failover` and `failover_priority` is set"""
         has_nofailover_tag = self.get('tags', {}).get('nofailover', None) is not None
