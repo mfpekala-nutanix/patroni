@@ -175,6 +175,21 @@ class TestPatroni(unittest.TestCase):
         self.assertTrue(self.p.nofailover)
         self.p.tags['nofailover'] = None
         self.assertFalse(self.p.nofailover)
+        self.p.tags['failover_priority'] = 0
+        self.assertTrue(self.p.nofailover)
+        self.p.tags['failover_priority'] = 1
+        self.assertFalse(self.p.nofailover)
+    
+    def test_failover_priority(self):
+        self.p.tags['nofailover'] = None
+        self.p.tags['failover_priority'] = 0
+        self.assertEqual(self.p.failover_priority, 0)
+        self.p.tags['failover_priority'] = 1
+        self.assertEqual(self.p.failover_priority, 1)
+        self.p.tags['failover_priority'] = None
+        self.assertEqual(self.p.failover_priority, 1)
+        self.p.tags['nofailover'] = True
+        self.assertEqual(self.p.failover_priority, 0)
 
     def test_replicatefrom(self):
         self.assertIsNone(self.p.replicatefrom)

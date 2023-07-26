@@ -104,7 +104,10 @@ class Patroni(AbstractPatroniDaemon):
         nofailover = self.tags.get('nofailover', None)
         if nofailover is not None:
             return 0 if nofailover else 1
-        return int(self.tags.get('failover_priority', 1))
+        fp = self.tags.get('failover_priority', 1)
+        if fp is None:
+            return 1
+        return fp
 
     @property
     def nosync(self) -> bool:
